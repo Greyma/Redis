@@ -20,7 +20,7 @@ socketio = SocketIO(app,
 clients = {"sender": None, "receiver": None}
 client_lock = threading.Lock()
 
-@app._got_first_request
+@app.before_first_request_funcs
 def setup():
     logger.info("Server setup complete")
 
