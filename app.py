@@ -32,4 +32,4 @@ def handle_send_data(data):
         emit('error', {'message': 'Session 1 non connectée'}, to=request.sid)
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=10000)
