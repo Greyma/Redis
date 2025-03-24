@@ -8,7 +8,12 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 clients = {"session2": None, "session1": None}
-pending_data = deque(maxlen=4)  # Limite à ~400 Mo
+pending_data = deque(maxlen=10)  # Limite à 10 chunks de données en attente
+
+# Vérifier la RAM disponible
+def check_memory_pressure():
+    mem = psutil.virtual_memory()
+    return mem.percent > 90  # Seuil à 90% d'utilisation
 
 @socketio.on('connect')
 def handle_connect():
@@ -39,15 +44,21 @@ def handle_register(data):
 
 @socketio.on('send_data')
 def handle_send_data(data):
-    print("Événement send_data reçu, taille :", len(data) / (1024 * 1024), "Mo")
+    print("Données reçues, taille :", len(data) / (1024 * 1024), "Mo")
     print("RAM utilisée :", psutil.virtual_memory().percent, "%")
+    
     if clients['session1']:
         emit('receive_data', data, to=clients['session1'])
         print("Données relayées de Session 2 à Session 1")
     else:
-        pending_data.append(data)
-        print("Session 1 non connectée, données mises en attente, file :", len(pending_data))
-        emit('error', {'message': 'Session 1 non connectée, données en attente'}, to=request.sid)
+        if not check_memory_pressure() and len(pending_data) < pending_data.maxlen:
+            pending_data.append(data)
+            print("Session 1 non connectée, données mises en attente, file :", len(pending_data))
+        else:
+            print("Mémoire ou file pleine, données rejetées")
+            emit('error', {
+                'message': 'Mémoire serveur insuffisante ou file pleine, données rejetées'
+            }, to=request.sid)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=10000)
