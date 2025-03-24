@@ -1,41 +1,63 @@
+import eventlet
+eventlet.monkey_patch()  # Doit être en tout premier !
+
 from flask import Flask , request
 from flask_socketio import SocketIO
 import threading
+import logging
+
+# Configuration du logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, 
+                   cors_allowed_origins="*",
+                   engineio_logger=True,
+                   logger=True,
+                   async_mode='eventlet')
 
 clients = {"sender": None, "receiver": None}
-buffer_lock = threading.Lock()
+client_lock = threading.Lock()
+
+@app.before_first_request
+def setup():
+    logger.info("Server setup complete")
 
 @socketio.on('connect')
 def handle_connect():
-    print(f"Client {request.sid} connecté")
+    logger.info(f"Client {request.sid} connected")
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    if clients['sender'] == request.sid:
-        clients['sender'] = None
-    elif clients['receiver'] == request.sid:
-        clients['receiver'] = None
+    with client_lock:
+        if clients['sender'] == request.sid:
+            clients['sender'] = None
+            logger.info("Sender disconnected")
+        elif clients['receiver'] == request.sid:
+            clients['receiver'] = None
+            logger.info("Receiver disconnected")
 
 @socketio.on('register')
 def handle_register(data):
-    with buffer_lock:
-        if data['type'] == 'session2':
+    with client_lock:
+        client_type = data.get('type')
+        if client_type == 'session2' and clients['sender'] is None:
             clients['sender'] = request.sid
-            print("Sender (Session2) enregistré")
-        elif data['type'] == 'session1':
+            logger.info(f"Sender registered (SID: {request.sid})")
+            if clients['receiver']:
+                socketio.emit('sender_ready', to=clients['receiver'])
+                
+        elif client_type == 'session1' and clients['receiver'] is None:
             clients['receiver'] = request.sid
-            print("Receiver (Session1-GPU) enregistré")
-            # Autoriser l'envoi initial
-            socketio.emit('receiver_ready', room=clients['sender'])
-
-@socketio.on('request_more_data')
-def handle_data_request(count):
-    with buffer_lock:
-        if clients['sender']:
-            socketio.emit('send_chunks', {'count': count}, room=clients['sender'])
+            logger.info(f"Receiver registered (SID: {request.sid})")
+            if clients['sender']:
+                socketio.emit('receiver_ready', to=clients['sender'])
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=10000)
+    socketio.run(app, 
+                host='0.0.0.0', 
+                port=10000, 
+                debug=True, 
+                use_reloader=False,
+                log_output=True)
