@@ -19,10 +19,14 @@ socketio = SocketIO(app,
 
 clients = {"sender": None, "receiver": None}
 client_lock = threading.Lock()
+is_initialized = False
 
-@app.before_first_request_funcs
-def setup():
-    logger.info("Server setup complete")
+@app.before_request
+def before_first_request():
+    global is_initialized
+    if not is_initialized:
+        logger.info("Server initial setup")
+        is_initialized = True
 
 @socketio.on('connect')
 def handle_connect():
