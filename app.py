@@ -8,7 +8,7 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 clients = {"session2": None, "session1": None}
-pending_data = deque(maxlen=10)  # Limite à 10 chunks de données en attente
+pending_data = deque(maxlen=40)  # Limite à 10 chunks de données en attente
 
 # Vérifier la RAM disponible
 def check_memory_pressure():
