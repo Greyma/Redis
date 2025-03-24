@@ -1,0 +1,5 @@
+services:
+  - type: web
+    name: redis-server
+    runtime: docker
+    port: 6379
