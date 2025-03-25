@@ -24,11 +24,11 @@ clients = {"sender": None, "receiver": None}
 pending_requests = 0
 lock = threading.Lock()
 
-@socketio.on('connect')
+@socketio.on('connect',namespace='/data')
 def handle_connect():
     logger.info(f"✓ Client connecté: {request.sid}")
 
-@socketio.on('disconnect')
+@socketio.on('disconnect',namespace='/data')
 def handle_disconnect():
     with lock:
         if clients['sender'] == request.sid:
@@ -40,7 +40,7 @@ def handle_disconnect():
         else:
             logger.info(f"✗ Client inconnu déconnecté: {request.sid}")
 
-@socketio.on('register')
+@socketio.on('register',namespace='/data')
 def handle_register(data):
     with lock:
         client_type = data.get('type')
@@ -55,7 +55,7 @@ def handle_register(data):
                 emit('send_chunks', {'count': 50}, room=clients['sender'])
                 logger.info("↳ Demande initiale de 50 chunks envoyée au sender")
 
-@socketio.on('request_more_data')
+@socketio.on('request_more_data',namespace='/data')
 def handle_data_request(data):
     global pending_requests
     count = data.get('count', 50)  # Valeur par défaut
@@ -72,7 +72,7 @@ def handle_data_request(data):
         else:
             logger.warning("⚠ Aucun sender disponible pour répondre à la demande")
 
-@socketio.on('receive_chunk')
+@socketio.on('receive_chunk',namespace='/data')
 def handle_receive_chunk(data):
     with lock:
         if request.sid == clients['sender'] and clients['receiver']:
@@ -83,7 +83,7 @@ def handle_receive_chunk(data):
         else:
             logger.warning(f"⚠ Chunk reçu d'un client inconnu: {request.sid}")
 
-@socketio.on('chunks_sent')
+@socketio.on('chunks_sent',namespace='/data')
 def handle_chunks_sent():
     global pending_requests
     with lock:
